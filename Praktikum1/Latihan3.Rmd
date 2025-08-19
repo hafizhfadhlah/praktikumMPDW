@@ -1,0 +1,22 @@
+---
+title: "Praktikum MPDW 1"
+author: "Tengku Muhammad Hafizh Fadhlah"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# Praktikum 1 MPDW
+
+```{r}
+x1 = 2
+x2 = 3
+x1 + x2
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
