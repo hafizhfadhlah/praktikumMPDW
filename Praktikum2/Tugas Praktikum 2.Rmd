@@ -1,0 +1,295 @@
+---
+title: "Tugas Praktikum 1"
+author: "Tengku Muhammad Hafizh Fadhlah"
+date: "2025-09-01"
+output: html_document
+---
+## Library
+
+```{r}
+library("forecast")
+library("graphics")
+library("TTR")
+library("TSA")
+library("ggplot2")
+```
+
+
+## Input Data
+
+Data yang digunakan adalah data penjualan es krim perbulannya.
+
+```{r}
+library(rio)
+data_all <- import("https://raw.githubusercontent.com/gryoirsyad/mpdw/refs/heads/main/ice_cream.csv")
+data_ice <- data_all[231:345,]
+```
+
+## Eksplorasi Data
+
+```{r}
+View(data_ice) # Melihat data
+str(data_ice) # Struktur data
+dim(data_ice) # Dimensi data
+```
+Mengubah data sebagai data deret waktu
+
+```{r}
+data_ice.ts <- ts(data_ice$IPN31152N)
+data_ice.ts
+```
+Menampilkan ringkasan data
+
+```{r}
+summary(data_ice.ts)
+library(tseries)
+adf.test(data_ice.ts)
+```
+p-value < 0.05 menyebabkan tolak H0 dan artinya data stasioner.
+
+Selanjutnya membuat *plot time-series* dari Data penjualan es krim perbulan.
+```{r}
+ts.plot(data_ice.ts, xlab="Time Period ", ylab="Sales Index", 
+        main = "Time Series Plot")
+points(data_ice.ts)
+```
+## Single Moving Average (SMA) dan Single Exponentional Smoothing (SES)
+
+Selanjutnya akan dilakukan ramalan dan pemulusan dengan metode SMA dan SES karena pola data stasioner atau konstan.
+
+#### Pembagian Data
+
+Pembagian data latih (80%) dan data uji (20%).
+
+```{r}
+training_ma <- data_ice[1:92,]
+testing_ma <- data_ice[93:115,]
+train_ma.ts <- ts(training_ma$IPN31152N)
+test_ma.ts <- ts(testing_ma$IPN31152N)
+```
+
+#### Eksplorasi Data
+
+```{r}
+# keseluruhan
+plot(data_ice.ts, col="red",main="Plot semua data")
+points(data_ice.ts)
+```
+
+```{r}
+# data latih
+plot(train_ma.ts, col="blue",main="Plot data latih")
+points(train_ma.ts)
+```
+
+```{r}
+# data uji
+plot(test_ma.ts, col="blue",main="Plot data uji")
+points(test_ma.ts)
+```
+
+
+```{r}
+library(ggplot2)
+ggplot() +
+  # garis untuk data latih
+  geom_line(data = training_ma, aes(x = DATE, y = IPN31152N, col = "Data Latih")) +
+  # garis untuk data uji
+  geom_line(data = testing_ma, aes(x = DATE, y = IPN31152N, col = "Data Uji")) +
+  # label sumbu dan legenda
+  labs(x = "Time Period", y = "Sales Index", color = "Keterangan") +
+  # atur warna manual
+  scale_colour_manual(
+    name = "Keterangan:",
+    breaks = c("Data Latih", "Data Uji"),
+    values = c("blue", "red")
+  ) +
+  # tema
+  theme_bw() +
+  theme(
+    legend.position = "bottom",
+    plot.caption = element_text(hjust = 0.5, size = 12)
+  )
+
+```
+#### SMA
+
+Pemulusan menggunakan metode SMA dengan fungsi *SMA()* dan parameter *m=2*
+
+```{r}
+library(TTR)
+data.sma <- SMA(train_ma.ts, n=2)
+data.sma
+```
+Dilakukan peramalan 1 periode ke depan
+```{r}
+data.ramal <- c(NA, data.sma)
+data.ramal 
+```
+Selanjutnya akan dilakukan peramalan sejumlah data uji yaitu 23 periode. Hasil peramalan 23 periode ke depan akan bernilai sama dengan hasil peramalan 1 periode ke depan.
+Akan dilakukan penggabungan data aktual, data hasil pemulusan, dan data hasil permalan 23 periode ke depan.
+```{r}
+data.gab<-cbind(aktual=c(train_ma.ts,rep(NA,41)),pemulusan=c(data.sma,rep(NA,41)),ramalan=c(data.ramal,rep(data.ramal[length(data.ramal)],40)))
+data.gab 
+```
+Plot time series dari hasil peramalan sebagai berikut
+```{r}
+ts.plot(data_ice.ts, xlab="Time Period ", ylab="Sales", main= "SMA N=2 Data Sales")
+points(data_ice.ts)
+lines(data.gab[,2],col="green",lwd=2)
+lines(data.gab[,3],col="red",lwd=2)
+legend("topleft",c("data aktual","data pemulusan","data peramalan"), lty=8, col=c("black","green","red"), cex=0.5)
+```
+Dilakukan perhitungan akurasi pada data latih
+```{r}
+error_train.sma = train_ma.ts-data.ramal[1:length(train_ma.ts)]
+SSE_train.sma = sum(error_train.sma[5:length(train_ma.ts)]^2)
+MSE_train.sma = mean(error_train.sma[5:length(train_ma.ts)]^2)
+MAPE_train.sma = mean(abs((error_train.sma[5:length(train_ma.ts)]/train_ma.ts[5:length(train_ma.ts)])*100))
+
+akurasi_train.sma <- matrix(c(SSE_train.sma, MSE_train.sma, MAPE_train.sma))
+row.names(akurasi_train.sma)<- c("SSE", "MSE", "MAPE")
+colnames(akurasi_train.sma) <- c("Akurasi m = 2")
+akurasi_train.sma
+```
+Didapatkan nilai MAPE data latih pada metode pemulusan SMA kurang dari 20%, artinya nilai ini cukup baik atau dapat diterima.
+Dilakukan perhituangan akurasi pada data uji
+```{r}
+error_test.sma = test_ma.ts-data.gab[93:115,3]
+SSE_test.sma = sum(error_test.sma^2)
+MSE_test.sma = mean(error_test.sma^2)
+MAPE_test.sma = mean(abs((error_test.sma/test_ma.ts*100)))
+
+akurasi_test.sma <- matrix(c(SSE_test.sma, MSE_test.sma, MAPE_test.sma))
+row.names(akurasi_test.sma)<- c("SSE", "MSE", "MAPE")
+colnames(akurasi_test.sma) <- c("Akurasi m = 2")
+akurasi_test.sma
+```
+Perhituangan akurasi menggunakan data uji menghasilkan nilai MAPE kurang dari 20%, sehingga nilai akurasi ini dapat dikategorikan cukup baik.
+
+#### Pembagian Data
+
+Pembagian data latih 80% dan data uji 20%
+
+```{r}
+training <- data_ice[1:92,]
+testing <- data_ice[93:115,]
+train.ts <- ts(training$IPN31152N)
+test.ts <- ts(testing$IPN31152N)
+```
+
+#### Eksplorasi Data
+
+```{r}
+# keseluruhan
+plot(data_ice.ts, col="red",main="Plot semua data")
+points(data_ice.ts)
+```
+
+```{r}
+# data latih
+plot(train.ts, col="blue",main="Plot data latih")
+points(train.ts)
+```
+
+```{r}
+# data uji
+plot(test.ts, col="blue",main="Plot data uji")
+points(test.ts)
+```
+Eksplorasi dengan package *ggplot2*
+```{r}
+ggplot() +
+  # garis untuk data latih
+  geom_line(data = training_ma, aes(x = DATE, y = IPN31152N, col = "Data Latih")) +
+  # garis untuk data uji
+  geom_line(data = testing_ma, aes(x = DATE, y = IPN31152N, col = "Data Uji")) +
+  # label sumbu dan legenda
+  labs(x = "Time Period", y = "Sales Index", color = "Keterangan") +
+  # atur warna manual
+  scale_colour_manual(
+    name = "Keterangan:",
+    breaks = c("Data Latih", "Data Uji"),
+    values = c("blue", "red")
+  ) +
+  # tema
+  theme_bw() +
+  theme(
+    legend.position = "bottom",
+    plot.caption = element_text(hjust = 0.5, size = 12)
+  )
+
+```
+
+#### SES
+
+Cara pertama adalah menggunakan fungsi *ses()* dari packages *forecast* dengan banyak periode data yang akan diramalkan adalah 23 periode dan nilai *alpha* 0,2 dan 0,7.
+
+```{r}
+library(forecast)
+ses.1 <- ses(train.ts, h = 23, alpha = 0.2)
+plot(ses.1)
+```
+```{r}
+ses.1
+```
+```{r}
+ses.2<- ses(train.ts, h = 23, alpha = 0.7)
+plot(ses.2)
+```
+```{r}
+ses.2
+```
+```{r}
+autoplot(ses.1) +
+  autolayer(fitted(ses.1), series="Fitted") +
+  ylab("Sales Index") + xlab("Time Period")
+```
+
+Cara kedua adalah menggunakan fungsi *HoltWinters()* dengan inisialisasi parameter dan panjang periode peramalan yang sama dengan fungsi ses()
+
+```{r}
+ses1<- HoltWinters(train.ts, gamma = FALSE, beta = FALSE, alpha = 0.2)
+plot(ses1)
+```
+```{r}
+# ramalan
+ramalan1 <- forecast(ses1, h=23)
+ramalan1
+```
+```{r}
+ses2<- HoltWinters(train.ts, gamma = FALSE, beta = FALSE, alpha = 0.7)
+plot(ses2)
+```
+```{r}
+# ramalan
+ramalan2<- forecast(ses2, h=23)
+ramalan2
+```
+Mengoptimalkan nilai parameter alpha dari kedua fungsi dengan menyesuaikan dari error-nya paling minimum (*alpha = NULL*)
+```{r}
+ses.opt <- ses(train.ts, h = 23, alpha = NULL)
+plot(ses.opt)
+```
+```{r}
+ses.opt
+```
+```{r}
+#Lamda Optimum Holt Winter
+sesopt<- HoltWinters(train.ts, gamma = FALSE, beta = FALSE,alpha = NULL)
+sesopt
+```
+```{r}
+plot(sesopt)
+```
+```{r}
+# ramalan
+ramalanopt <- forecast(sesopt, h=23)
+ramalanopt
+```
+
+#### Akurasi Data
+
+```{r}
+accuracy(ramalanopt,testing$IPN31152N)
+```
