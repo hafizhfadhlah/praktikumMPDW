@@ -1,0 +1,72 @@
+---
+title: "Tugas Praktikum 5 MPDW"
+author: "Tengku Muhammad Hafizh Fadhlah"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r}
+library(readxl)
+data_excel <- read_excel("C:/Users/Hafizh Fadhlah/OneDrive/Documents/ice_cream.xlsx")
+data <- data_excel[231:345,]
+data
+```
+```{r}
+library(ggplot2)
+library(tseries)
+library(tsibble)
+library(MASS)
+```
+# Ubah Format Data Menjadi Time Series
+```{r}
+data.ts <- ts(data$IPN31152N)
+```
+
+# Plot Time Series
+```{r}
+ts.plot(data.ts, xlab="Time Period ", ylab="IPN31152N", 
+        main = "Time Series Plot IPN31152N")
+points(data.ts)
+
+```
+```{r}
+lattice::densityplot(as.vector(data$IPN31152N))
+```
+
+```{r}
+summary(data.ts)
+```
+
+# Plot ACF
+```{r}
+acf(data.ts, main="ACF IPN31152N")
+```
+```{r}
+tseries::adf.test(data.ts)
+```
+
+# Plot Box-Cox
+```{r}
+index <- seq(1:115)
+
+# Box-Cox
+bc <- boxcox(
+  data$IPN31152N ~ index,
+  lambda = seq(-1, 4, by = 0.01)
+)
+
+# Nilai lambda optimum
+lambda <- bc$x[which.max(bc$y)]
+lambda
+
+# Selang kepercayaan 95% untuk lambda
+ci_lambda <- bc$x[bc$y > max(bc$y) - 0.5 * qchisq(0.95, 1)]
+
+# Batas bawah dan batas atas
+ci_lower <- min(ci_lambda)
+ci_upper <- max(ci_lambda)
+
+c(Batas_Bawah = ci_lower, Batas_Atas = ci_upper)
+
+```
+
